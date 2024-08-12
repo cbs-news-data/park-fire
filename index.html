@@ -204,163 +204,199 @@
 
 <script src="https://unpkg.com/maplibre-gl@2.3.0/dist/maplibre-gl.js"></script>
 <script>
- const map = new maplibregl.Map({
-  container: "map",
-  style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-  center: [-121.8047, 40.076],
-  zoom: 8.5,
-  maxZoom: 10,
-  minZoom: 3,
-});
-
-map.scrollZoom.disable();
-map.addControl(new maplibregl.NavigationControl(), "top-left");
-
-const decadeFiles = {
-  1950: "data/01.json",
-  1960: "data/02.json",
-  1970: "data/3.5.json",
-  1980: "data/03.json",
-  1990: "data/04.json",
-  2000: "data/05.json",
-  2010: "data/06.json",
-  2020: "data/07.json",
-  2030: "data/08.json",
-  2040: "data/09.json",
-  2050: "data/10.json",
-  2060: "data/11.json",
-  2070: "data/12.json",
-};
-
-let currentDecade = 1950;
-let layerId = `polygon-${currentDecade}`;
-
-const getColorForDecade = (decade) => {
-  const colors = [
-    "#A5091E"
-  ];
-  const index = (decade - 1950) / 10;
-  return colors[Math.min(index, colors.length - 1)];
-};
-
-const updateGeoJSONSource = (decade) => {
-  fetch(decadeFiles[decade])
-    .then(response => response.json())
-    .then(data => {
-      const color = getColorForDecade(decade);
-
-      if (map.getSource(layerId)) {
-        map.getSource(layerId).setData(data);
-      } else {
-        map.addSource(layerId, {
-          type: "geojson",
-          data: data,
-        });
-
-        map.addLayer({
-          id: layerId,
-          type: "fill",
-          source: layerId,
-          layout: {},
-          paint: {
-            "fill-color": color,
-            "fill-opacity": 0.5,
-          },
-        });
-      }
-
-      const dateTime = data.features.length > 0 ? data.features[0].properties.PROG_DATETIME : "";
-      const dateTimeFormatted = formatDateTime(dateTime);
-      document.getElementById("slider-label").innerText = dateTimeFormatted;
-
-      currentDecade = decade;
-    })
-    .catch(error => console.error("Error loading GeoJSON:", error));
-};
-
-const formatDateTime = (dateTime) => {
-  if (!dateTime) return "No Data";
-  const date = new Date(dateTime);
-  const options = {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "numeric",
-    timeZone: "America/Los_Angeles",
-    timeZoneName: "short",
-  };
-  const formatter = new Intl.DateTimeFormat("en-US", options);
-  const formattedDate = formatter.format(date);
+    let map; // Declare map variable globally
   
-  // Replace PST with PDT if the date is during daylight saving time
-  return formattedDate.replace("PST", "PDT");
-};
-
-const removeLayer = (decade) => {
-  const layerId = `polygon-${decade}`;
-  if (map.getLayer(layerId)) {
-    map.removeLayer(layerId);
-    map.removeSource(layerId);
-  }
-};
-
-map.on("load", () => {
-  updateGeoJSONSource(currentDecade);
-});
-
-document.getElementById("slider").addEventListener("input", (event) => {
-  const decade = parseInt(event.target.value);
-  if (decade !== currentDecade) {
-    if (decade < currentDecade) {
-      removeLayer(currentDecade);
-    }
-    updateGeoJSONSource(decade);
-  }
-});
-
-let isPlaying = false;
-let playInterval;
-
-const playPauseButton = document.getElementById("play-pause");
-const playIcon = '<i class="fas fa-play"></i>';
-const pauseIcon = '<i class="fas fa-pause"></i>';
-
-const play = () => {
-  isPlaying = true;
-  playPauseButton.innerHTML = pauseIcon;
-  playInterval = setInterval(() => {
-    const slider = document.getElementById("slider");
-    let currentDecade = parseInt(slider.value);
-    if (currentDecade < 2070) {
-      currentDecade += 10;
-      slider.value = currentDecade;
-      document.getElementById("slider-label").textContent = `${currentDecade}s`;
-      updateGeoJSONSource(currentDecade);
-    } else {
-      clearInterval(playInterval);
-      playPauseButton.innerHTML = playIcon;
+    // Function to initialize the map
+    const initializeMap = (config) => {
+      if (map) {
+        // Update existing map configuration
+        map.setStyle(config.style);
+        map.setCenter(config.center);
+        map.setZoom(config.zoom);
+        map.setMaxZoom(config.maxZoom);
+        map.setMinZoom(config.minZoom);
+      } else {
+        // Create new map instance
+        map = new maplibregl.Map(config);
+        map.scrollZoom.disable();
+        map.addControl(new maplibregl.NavigationControl(), "top-left");
+      }
+    };
+  
+    const mapConfig = {
+      container: "map",
+      style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+      center: [-121.8047, 40.076],
+      zoom: 8.5,
+      maxZoom: 10,
+      minZoom: 3,
+    };
+  
+    const mobileMapConfig = {
+      container: "map",
+      style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+      center: [-121.8047, 40.076],
+      zoom: 7, // Adjust zoom level for mobile
+      maxZoom: 8, // Adjust max zoom for mobile
+      minZoom: 3,
+    };
+  
+    // Function to check screen width and initialize map with appropriate settings
+    const setupMap = () => {
+      const mapConfigToUse = window.innerWidth <= 768 ? mobileMapConfig : mapConfig;
+      initializeMap(mapConfigToUse);
+    };
+  
+    // Initialize map on page load
+    document.addEventListener("DOMContentLoaded", () => {
+      setupMap();
+      map.on("load", () => {
+        updateGeoJSONSource(currentDecade);
+      });
+    });
+  
+    // Reinitialize map on window resize
+    window.addEventListener("resize", setupMap);
+  
+    const decadeFiles = {
+      1950: "data/01.json",
+      1960: "data/02.json",
+      1970: "data/3.5.json",
+      1980: "data/03.json",
+      1990: "data/04.json",
+      2000: "data/05.json",
+      2010: "data/06.json",
+      2020: "data/07.json",
+      2030: "data/08.json",
+      2040: "data/09.json",
+      2050: "data/10.json",
+      2060: "data/11.json",
+      2070: "data/12.json",
+    };
+  
+    let currentDecade = 1950;
+    let layerId = `polygon-${currentDecade}`;
+  
+    const getColorForDecade = (decade) => {
+      const colors = ["#A5091E"];
+      const index = (decade - 1950) / 10;
+      return colors[Math.min(index, colors.length - 1)];
+    };
+  
+    const updateGeoJSONSource = (decade) => {
+      fetch(decadeFiles[decade])
+        .then(response => response.json())
+        .then(data => {
+          const color = getColorForDecade(decade);
+  
+          if (map.getSource(layerId)) {
+            map.getSource(layerId).setData(data);
+          } else {
+            map.addSource(layerId, {
+              type: "geojson",
+              data: data,
+            });
+  
+            map.addLayer({
+              id: layerId,
+              type: "fill",
+              source: layerId,
+              layout: {},
+              paint: {
+                "fill-color": color,
+                "fill-opacity": 0.5,
+              },
+            });
+          }
+  
+          const dateTime = data.features.length > 0 ? data.features[0].properties.PROG_DATETIME : "";
+          const dateTimeFormatted = formatDateTime(dateTime);
+          document.getElementById("slider-label").innerText = dateTimeFormatted;
+  
+          currentDecade = decade;
+        })
+        .catch(error => console.error("Error loading GeoJSON:", error));
+    };
+  
+    const formatDateTime = (dateTime) => {
+      if (!dateTime) return "No Data";
+      const date = new Date(dateTime);
+      const options = {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+        timeZone: "America/Los_Angeles",
+        timeZoneName: "short",
+      };
+      const formatter = new Intl.DateTimeFormat("en-US", options);
+      const formattedDate = formatter.format(date);
+      
+      // Replace PST with PDT if the date is during daylight saving time
+      return formattedDate.replace("PST", "PDT");
+    };
+  
+    const removeLayer = (decade) => {
+      const layerId = `polygon-${decade}`;
+      if (map.getLayer(layerId)) {
+        map.removeLayer(layerId);
+        map.removeSource(layerId);
+      }
+    };
+  
+    document.getElementById("slider").addEventListener("input", (event) => {
+      const decade = parseInt(event.target.value);
+      if (decade !== currentDecade) {
+        if (decade < currentDecade) {
+          removeLayer(currentDecade);
+        }
+        updateGeoJSONSource(decade);
+      }
+    });
+  
+    let isPlaying = false;
+    let playInterval;
+  
+    const playPauseButton = document.getElementById("play-pause");
+    const playIcon = '<i class="fas fa-play"></i>';
+    const pauseIcon = '<i class="fas fa-pause"></i>';
+  
+    const play = () => {
+      isPlaying = true;
+      playPauseButton.innerHTML = pauseIcon;
+      playInterval = setInterval(() => {
+        const slider = document.getElementById("slider");
+        let currentDecade = parseInt(slider.value);
+        if (currentDecade < 2070) {
+          currentDecade += 10;
+          slider.value = currentDecade;
+          document.getElementById("slider-label").textContent = `${currentDecade}s`;
+          updateGeoJSONSource(currentDecade);
+        } else {
+          clearInterval(playInterval);
+          playPauseButton.innerHTML = playIcon;
+          isPlaying = false;
+        }
+      }, 1200);
+    };
+  
+    const pause = () => {
       isPlaying = false;
-    }
-  }, 1200);
-};
-
-const pause = () => {
-  isPlaying = false;
-  playPauseButton.innerHTML = playIcon;
-  clearInterval(playInterval);
-};
-
-playPauseButton.addEventListener("click", () => {
-  if (isPlaying) {
-    pause();
-  } else {
-    play();
-  }
-});
-
-document.addEventListener("DOMContentLoaded", () => {
-  var pymChild = new pym.Child();
-  pymChild.sendHeight();
-});
-</script>
+      playPauseButton.innerHTML = playIcon;
+      clearInterval(playInterval);
+    };
+  
+    playPauseButton.addEventListener("click", () => {
+      if (isPlaying) {
+        pause();
+      } else {
+        play();
+      }
+    });
+  
+    document.addEventListener("DOMContentLoaded", () => {
+      var pymChild = new pym.Child();
+      pymChild.sendHeight();
+    });
+  </script>
