@@ -36,7 +36,7 @@
   #container {
     display: flex;
     flex-direction: column;
-    height: 200vh;
+    height: 150vh;
   }
   #header {
     z-index: 1;
@@ -100,7 +100,7 @@
   }
   #map {
     flex-grow: 1;
-    max-height: 800px;
+    max-height: 650px;
     max-width: 600px;
     margin-bottom: 12px;
   }
@@ -174,11 +174,11 @@
 
 <div id="container">
   <div id="header">
-    <div class="title">How Park Fire grew</div>
-    <p class="description">TKTK</p>
+    <div class="title">The evolution of Park Fire</div>
+    <p class="description">The Park Fire in Northern California started on July 24 after 3 p.m. and burned nearly 125,000 acres by the end of the next day. Use the slider below to see how the fire has grown.</p>
   </div>
   <div id="slider-container">
-    <label for="slider" id="slider-label">1950s</label>
+    <label for="slider" id="slider-label">July 24 at 11:20 AM PST</label>
     <div id="slider-wrapper">
       <button id="play-pause" class="play-pause-button">
         <i class="fas fa-play"></i>
@@ -195,7 +195,7 @@
     </div>
   </div>
   <div id="map"></div>
-  <div class="note">Note: Fire progression as of Aug. 12 at XX PST.</div>
+  <div class="note">Note: Fire progression as of Aug. 8 at XX PST.</div>
   <div class="source">
     Source:
     <a href="#" target="_blank">CalFire</a>
@@ -205,50 +205,54 @@
 
 <script src="https://unpkg.com/maplibre-gl@2.3.0/dist/maplibre-gl.js"></script>
 <script>
-  const map = new maplibregl.Map({
-    container: "map", // container id
-    style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json", // style URL
-    center: [-121.8047, 40.076], // starting position [lng, lat]
-    zoom: 9,
-    maxZoom: 10,
-    minZoom: 3,
-    hash: true,
-  });
+ const map = new maplibregl.Map({
+  container: "map",
+  style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+  center: [-121.8047, 40.076],
+  zoom: 8.5,
+  maxZoom: 10,
+  minZoom: 3,
+});
 
-  // Disable scroll zoom
-  map.scrollZoom.disable();
+map.scrollZoom.disable();
+map.addControl(new maplibregl.NavigationControl(), "top-left");
 
-  // Add zoom and rotation controls to the map.
-  map.addControl(new maplibregl.NavigationControl(), "top-left");
+const decadeFiles = {
+  1950: "data/01.json",
+  1960: "data/02.json",
+  1970: "data/3.5.json",
+  1980: "data/03.json",
+  1990: "data/04.json",
+  2000: "data/05.json",
+  2010: "data/06.json",
+  2020: "data/07.json",
+  2030: "data/08.json",
+  2040: "data/09.json",
+  2050: "data/10.json",
+  2060: "data/11.json",
+  2070: "data/12.json",
+};
 
-  // Decade files with paths
-  const decadeFiles = {
-    1950: "data/01.json",
-    1960: "data/02.json",
-    1970: "data/3.5.json",
-    1980: "data/03.json",
-    1990: "data/04.json",
-    2000: "data/05.json",
-    2010: "data/06.json",
-    2020: "data/07.json",
-    2030: "data/08.json",
-    2040: "data/09.json",
-    2050: "data/10.json",
-    2060: "data/11.json",
-    2070: "data/12.json",
-    // Add more decades as needed
-  };
+let currentDecade = 1950;
+let layerId = `polygon-${currentDecade}`;
 
-  let currentDecade = 1950; // Start with the initial decade
+const getColorForDecade = (decade) => {
+  const colors = [
+    "#A5091E"
+  ];
+  const index = (decade - 1950) / 10;
+  return colors[Math.min(index, colors.length - 1)];
+};
 
-  // Function to update the GeoJSON source
-  const updateGeoJSONSource = (decade) => {
-    fetch(decadeFiles[decade])
-      .then((response) => response.json())
-      .then((data) => {
-        const layerId = `polygon-${decade}`;
+const updateGeoJSONSource = (decade) => {
+  fetch(decadeFiles[decade])
+    .then(response => response.json())
+    .then(data => {
+      const color = getColorForDecade(decade);
 
-        // Add a new layer for the new decade
+      if (map.getSource(layerId)) {
+        map.getSource(layerId).setData(data);
+      } else {
         map.addSource(layerId, {
           type: "geojson",
           data: data,
@@ -260,122 +264,101 @@
           source: layerId,
           layout: {},
           paint: {
-            "fill-color": "#A5091E",
-            "fill-opacity": 0.3,
+            "fill-color": color,
+            "fill-opacity": 0.5,
           },
         });
+      }
 
-        // Extract date and time from the data
-        const dateTime =
-          data.features.length > 0
-            ? data.features[0].properties.PROG_DATETIME
-            : "";
-        const dateTimeFormatted = formatDateTime(dateTime);
+      const dateTime = data.features.length > 0 ? data.features[0].properties.PROG_DATETIME : "";
+      const dateTimeFormatted = formatDateTime(dateTime);
+      document.getElementById("slider-label").innerText = dateTimeFormatted;
 
-        // Update slider label with date and time
-        document.getElementById("slider-label").innerText = dateTimeFormatted;
+      currentDecade = decade;
+    })
+    .catch(error => console.error("Error loading GeoJSON:", error));
+};
 
-        // Update the current decade
-        currentDecade = decade;
-      })
-      .catch((error) => console.error("Error loading GeoJSON:", error));
-  };
-
-  const formatDateTime = (dateTime) => {
-    if (!dateTime) return "No Data";
-
-    const date = new Date(dateTime);
-
-    // Create a formatter for Los Angeles time zone
-    const formatter = new Intl.DateTimeFormat("en-US", {
-      month: "long",
-      day: "numeric",
-      hour: "numeric",
-      minute: "numeric",
-      hour12: true,
-      timeZone: "America/Los_Angeles",
-      timeZoneName: "short",
-    });
-
-    const formattedDate = formatter.format(date);
-
-    // Replace time zone abbreviation with 'PST'
-    return formattedDate.replace(/(?:\s[A-Z]{2,3})$/, " PST");
-  };
-
-  // Function to remove the layer
-  const removeLayer = (decade) => {
-    const layerId = `polygon-${decade}`;
-    if (map.getLayer(layerId)) {
-      map.removeLayer(layerId);
-      map.removeSource(layerId);
-    }
-  };
-
-  // Initial load
-  map.on("load", () => {
-    updateGeoJSONSource(currentDecade);
+const formatDateTime = (dateTime) => {
+  if (!dateTime) return "No Data";
+  const date = new Date(dateTime);
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: true,
+    timeZone: "America/Los_Angeles",
+    timeZoneName: "short",
   });
+  const formattedDate = formatter.format(date);
+  return formattedDate.replace(/(?:\s[A-Z]{2,3})$/, " PST");
+};
 
-  // Update map when slider changes
-  document.getElementById("slider").addEventListener("input", (event) => {
-    const decade = parseInt(event.target.value);
-    const isDraggingBackward = decade < currentDecade;
+const removeLayer = (decade) => {
+  const layerId = `polygon-${decade}`;
+  if (map.getLayer(layerId)) {
+    map.removeLayer(layerId);
+    map.removeSource(layerId);
+  }
+};
 
-    if (isDraggingBackward) {
-      // Remove the previous layer if dragging backward
+map.on("load", () => {
+  updateGeoJSONSource(currentDecade);
+});
+
+document.getElementById("slider").addEventListener("input", (event) => {
+  const decade = parseInt(event.target.value);
+  if (decade !== currentDecade) {
+    if (decade < currentDecade) {
       removeLayer(currentDecade);
     }
-
-    // Update the map with the new decade layer
     updateGeoJSONSource(decade);
-  });
+  }
+});
 
-  // Play/Pause functionality
-  let isPlaying = false;
-  let playInterval;
+let isPlaying = false;
+let playInterval;
 
-  const playPauseButton = document.getElementById("play-pause");
-  const playIcon = '<i class="fas fa-play"></i>';
-  const pauseIcon = '<i class="fas fa-pause"></i>';
+const playPauseButton = document.getElementById("play-pause");
+const playIcon = '<i class="fas fa-play"></i>';
+const pauseIcon = '<i class="fas fa-pause"></i>';
 
-  const play = () => {
-    isPlaying = true;
-    playPauseButton.innerHTML = pauseIcon;
-    playInterval = setInterval(() => {
-      const slider = document.getElementById("slider");
-      let currentDecade = parseInt(slider.value);
-      if (currentDecade < 2020) {
-        currentDecade += 10;
-        slider.value = currentDecade;
-        document.getElementById(
-          "slider-label"
-        ).textContent = `${currentDecade}s`;
-        updateGeoJSONSource(currentDecade);
-      } else {
-        clearInterval(playInterval);
-        playPauseButton.innerHTML = playIcon;
-        isPlaying = false;
-      }
-    }, 2000);
-  };
-
-  const pause = () => {
-    isPlaying = false;
-    playPauseButton.innerHTML = playIcon;
-    clearInterval(playInterval);
-  };
-
-  playPauseButton.addEventListener("click", () => {
-    if (isPlaying) {
-      pause();
+const play = () => {
+  isPlaying = true;
+  playPauseButton.innerHTML = pauseIcon;
+  playInterval = setInterval(() => {
+    const slider = document.getElementById("slider");
+    let currentDecade = parseInt(slider.value);
+    if (currentDecade < 2070) {
+      currentDecade += 10;
+      slider.value = currentDecade;
+      document.getElementById("slider-label").textContent = `${currentDecade}s`;
+      updateGeoJSONSource(currentDecade);
     } else {
-      play();
+      clearInterval(playInterval);
+      playPauseButton.innerHTML = playIcon;
+      isPlaying = false;
     }
-  });
+  }, 1200);
+};
 
-  document.addEventListener("DOMContentLoaded", function () {
-    var pymChild = new pym.Child();
-    pymChild.sendHeight();
-  });
+const pause = () => {
+  isPlaying = false;
+  playPauseButton.innerHTML = playIcon;
+  clearInterval(playInterval);
+};
+
+playPauseButton.addEventListener("click", () => {
+  if (isPlaying) {
+    pause();
+  } else {
+    play();
+  }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  var pymChild = new pym.Child();
+  pymChild.sendHeight();
+});
 </script>
